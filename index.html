@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Studio - 회의 녹음 & STT</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    background: #000;
+    color: #fff;
+    min-height: 100vh;
+  }
+  
+  .header {
+    border-bottom: 1px solid #27272a;
+    background: #09090b;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  
+  .header-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 25px -5px rgba(127, 29, 29, 0.5);
+  }
+  
+  .logo h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  
+  .logo p {
+    font-size: 11px;
+    color: #71717a;
+    letter-spacing: 3px;
+  }
+  
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #52525b;
+  }
+  
+  .status-dot.recording {
+    background: #ef4444;
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  
+  .status-text {
+    font-size: 11px;
+    color: #71717a;
+    letter-spacing: 3px;
+    font-family: monospace;
+  }
+  
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+  }
+  
+  @media (max-width: 1000px) {
+    .container { grid-template-columns: 1fr; }
+  }
+  
+  .panel {
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  
+  .recorder {
+    padding: 24px;
+  }
+  
+  .time-display {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .time-box {
+    display: inline-block;
+    background: #000;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 12px 24px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  .time-label {
+    font-size: 10px;
+    color: #71717a;
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+  }
+  
+  .time-value {
+    font-size: 42px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #d4d4d8;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  .time-value.recording {
+    color: #ef4444;
+  }
+  
+  .visualizer {
+    background: #000;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 16px;
+    height: 80px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .bar {
+    width: 6px;
+    height: 4px;
+    border-radius: 3px;
+    background: #27272a;
+    transition: all 0.075s;
+  }
+  
+  .bar.active {
+    background: linear-gradient(to top, #dc2626, #f97316);
+  }
+  
+  .record-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .record-btn {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    box-shadow: 0 25px 50px -12px rgba(127, 29, 29, 0.5);
+  }
+  
+  .record-btn:hover {
+    transform: scale(1.05);
+  }
+  
+  .record-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .record-btn.recording {
+    background: #dc2626;
+  }
+  
+  .record-btn.recording::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #ef4444;
+    opacity: 0.3;
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  
+  .record-btn.recording::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid #f87171;
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes ping {
+    75%, 100% { transform: scale(1.3); opacity: 0; }
+  }
+  
+  .record-btn svg {
+    color: white;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .btn-label-ko {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: #d4d4d8;
+    text-align: center;
+  }
+  
+  .btn-label-en {
+    font-size: 10px;
+    color: #52525b;
+    letter-spacing: 2px;
+    margin-top: 2px;
+    text-align: center;
+  }
+  
+  .lang-selector {
+    margin-bottom: 16px;
+  }
+  
+  .lang-selector label {
+    display: block;
+    font-size: 10px;
+    color: #71717a;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  
+  .lang-selector select {
+    width: 100%;
+    background: #000;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    color: #d4d4d8;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  
+  .lang-selector select:focus {
+    outline: none;
+    border-color: #dc2626;
+  }
+  
+  .error {
+    margin-top: 16px;
+    background: rgba(127, 29, 29, 0.3);
+    border: 1px solid #7f1d1d;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    color: #fca5a5;
+  }
+  
+  .warning {
+    margin-top: 16px;
+    background: rgba(120, 53, 15, 0.3);
+    border: 1px solid #78350f;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    color: #fcd34d;
+  }
+  
+  .meta-info {
+    margin-top: 16px;
+    padding: 12px 0 0;
+    border-top: 1px solid #27272a;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #52525b;
+    letter-spacing: 2px;
+  }
+  
+  /* Transcript Panel */
+  .transcript-header {
+    border-bottom: 1px solid #27272a;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(24, 24, 27, 0.5);
+  }
+  
+  .transcript-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .transcript-title h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  
+  .word-count {
+    font-size: 11px;
+    color: #71717a;
+    font-family: monospace;
+    padding: 4px 8px;
+    background: #18181b;
+    border-radius: 4px;
+  }
+  
+  .transcript-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .action-pill {
+    background: #18181b;
+    border: 1px solid #27272a;
+    color: #d4d4d8;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  
+  .action-pill:hover {
+    background: #27272a;
+    border-color: #3f3f46;
+  }
+  
+  .action-pill:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  .action-pill.primary {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: white;
+  }
+  
+  .action-pill.primary:hover {
+    background: #b91c1c;
+  }
+  
+  .transcript-body {
+    padding: 24px;
+    min-height: 500px;
+    max-height: 700px;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.9;
+    color: #e4e4e7;
+  }
+  
+  .transcript-empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: #52525b;
+  }
+  
+  .transcript-empty-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: #18181b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3f3f46;
+  }
+  
+  .transcript-empty p:first-of-type {
+    font-size: 15px;
+    color: #71717a;
+    margin-bottom: 6px;
+  }
+  
+  .transcript-empty p:last-of-type {
+    font-size: 11px;
+    color: #3f3f46;
+    letter-spacing: 2px;
+  }
+  
+  .transcript-line {
+    margin-bottom: 14px;
+    padding-left: 60px;
+    position: relative;
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .transcript-time {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    font-size: 11px;
+    color: #52525b;
+    font-family: monospace;
+    background: #18181b;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  
+  .transcript-text {
+    color: #e4e4e7;
+  }
+  
+  .transcript-interim {
+    color: #71717a;
+    font-style: italic;
+  }
+  
+  .transcript-interim::after {
+    content: '▊';
+    color: #ef4444;
+    animation: blink 1s infinite;
+    margin-left: 2px;
+  }
+  
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+  
+  /* Library Section */
+  .library-section {
+    margin-top: 24px;
+  }
+  
+  .library-header {
+    border-bottom: 1px solid #27272a;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(24, 24, 27, 0.5);
+  }
+  
+  .library-header h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+  
+  .library-list {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .empty {
+    padding: 32px 24px;
+    text-align: center;
+    font-size: 13px;
+    color: #52525b;
+  }
+  
+  .recording-item {
+    padding: 14px 16px;
+    border-bottom: 1px solid #27272a;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  
+  .recording-item:last-child {
+    border-bottom: none;
+  }
+  
+  .recording-item:hover { 
+    background: rgba(24, 24, 27, 0.7); 
+  }
+  
+  .recording-item.active {
+    background: rgba(127, 29, 29, 0.15);
+    border-left: 3px solid #dc2626;
+  }
+  
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .play-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: #27272a;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  
+  .play-btn:hover { background: #3f3f46; }
+  
+  .play-btn.playing {
+    background: #f97316;
+  }
+  
+  .item-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .item-name {
+    font-size: 13px;
+    color: #e4e4e7;
+    font-weight: 500;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .item-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: #71717a;
+    font-family: monospace;
+  }
+  
+  .item-actions {
+    display: flex;
+    gap: 4px;
+  }
+  
+  .action-btn {
+    padding: 6px;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #71717a;
+    display: flex;
+    transition: all 0.2s;
+  }
+  
+  .action-btn:hover { background: #27272a; color: #d4d4d8; }
+  .action-btn.delete:hover { background: rgba(127, 29, 29, 0.3); color: #f87171; }
+  
+  .library-list::-webkit-scrollbar,
+  .transcript-body::-webkit-scrollbar { width: 8px; }
+  .library-list::-webkit-scrollbar-track,
+  .transcript-body::-webkit-scrollbar-track { background: #09090b; }
+  .library-list::-webkit-scrollbar-thumb,
+  .transcript-body::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+  
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #18181b;
+    border: 1px solid #27272a;
+    color: #e4e4e7;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" x2="12" y1="19" y2="22"></line>
+        </svg>
+      </div>
+      <div>
+        <h1>VOICE STUDIO</h1>
+        <p>MEETING TRANSCRIBER</p>
+      </div>
+    </div>
+    <div class="status">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">STANDBY</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Left: Recorder -->
+  <div>
+    <div class="panel recorder">
+      <div class="lang-selector">
+        <label>LANGUAGE / 언어</label>
+        <select id="langSelect">
+          <option value="ko-KR">한국어 (Korean)</option>
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="ja-JP">日本語 (Japanese)</option>
+          <option value="zh-CN">中文 (Chinese)</option>
+          <option value="es-ES">Español (Spanish)</option>
+          <option value="fr-FR">Français (French)</option>
+          <option value="de-DE">Deutsch (German)</option>
+        </select>
+      </div>
+
+      <div class="time-display">
+        <div class="time-box">
+          <div class="time-label">ELAPSED TIME</div>
+          <div class="time-value" id="timeValue">00:00</div>
+        </div>
+      </div>
+
+      <div class="visualizer">
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <div class="record-section">
+        <button class="record-btn" id="recordBtn">
+          <svg id="recordIcon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" x2="12" y1="19" y2="22"></line>
+          </svg>
+        </button>
+        <div>
+          <div class="btn-label-ko" id="btnLabelKo">녹음 + STT 시작</div>
+          <div class="btn-label-en" id="btnLabelEn">CLICK TO START</div>
+        </div>
+      </div>
+
+      <div id="errorBox"></div>
+      <div id="warningBox"></div>
+
+      <div class="meta-info">
+        <span>48kHz · OPUS</span>
+        <span id="trackCount">0 TRACKS</span>
+      </div>
+    </div>
+
+    <!-- Library -->
+    <div class="panel library-section">
+      <div class="library-header">
+        <h2>녹음 라이브러리</h2>
+        <span class="word-count" id="libraryCount">0</span>
+      </div>
+      <div class="library-list" id="libraryList">
+        <div class="empty">아직 녹음이 없습니다</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Transcript -->
+  <div class="panel">
+    <div class="transcript-header">
+      <div class="transcript-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f97316;">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <h2>실시간 스크립트</h2>
+        <span class="word-count" id="wordCount">0 단어</span>
+      </div>
+      <div class="transcript-actions">
+        <button class="action-pill" id="copyBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          복사
+        </button>
+        <button class="action-pill" id="downloadTxtBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          TXT
+        </button>
+        <button class="action-pill" id="clearBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+          지우기
+        </button>
+      </div>
+    </div>
+    <div class="transcript-body" id="transcriptBody">
+      <div class="transcript-empty" id="transcriptEmpty">
+        <div class="transcript-empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+        </div>
+        <p>녹음을 시작하면 여기에 텍스트가 표시됩니다</p>
+        <p>SPEECH WILL APPEAR HERE</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ====== State ======
+  let isRecording = false;
+  let mediaRecorder = null;
+  let chunks = [];
+  let stream = null;
+  let audioContext = null;
+  let analyser = null;
+  let animationId = null;
+  let timerId = null;
+  let startTime = 0;
+  let recordings = [];
+  let currentAudio = null;
+  let currentPlayingId = null;
+  let db = null;
+
+  // ====== IndexedDB Setup ======
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('VoiceStudioDB', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = (e) => {
+        const database = e.target.result;
+        if (!database.objectStoreNames.contains('recordings')) {
+          const store = database.createObjectStore('recordings', { keyPath: 'id' });
+          store.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+      };
+    });
+  }
+
+  async function saveRecordingToDB(recording) {
+    if (!db) return;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['recordings'], 'readwrite');
+      const store = tx.objectStore('recordings');
+      // Store blob directly - IndexedDB can store Blobs natively
+      const data = {
+        id: recording.id,
+        name: recording.name,
+        duration: recording.duration,
+        createdAt: recording.createdAt,
+        mimeType: recording.mimeType,
+        transcript: recording.transcript,
+        blob: recording.blob,
+      };
+      const request = store.put(data);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function loadRecordingsFromDB() {
+    if (!db) return [];
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['recordings'], 'readonly');
+      const store = tx.objectStore('recordings');
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const items = request.result || [];
+        // Sort by newest first
+        items.sort((a, b) => b.createdAt - a.createdAt);
+        // Create object URLs from blobs
+        const restored = items.map(item => ({
+          ...item,
+          url: URL.createObjectURL(item.blob),
+        }));
+        resolve(restored);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function deleteRecordingFromDB(id) {
+    if (!db) return;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['recordings'], 'readwrite');
+      const store = tx.objectStore('recordings');
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function updateRecordingInDB(id, updates) {
+    if (!db) return;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['recordings'], 'readwrite');
+      const store = tx.objectStore('recordings');
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const data = getReq.result;
+        if (!data) { resolve(); return; }
+        Object.assign(data, updates);
+        const putReq = store.put(data);
+        putReq.onsuccess = () => resolve();
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+  }
+  
+  // STT State
+  let recognition = null;
+  let transcriptLines = []; // {time, text, final}
+  let interimText = '';
+  let lastSpeechTime = 0;
+  let silenceBreakThreshold = 2500; // ms - pause before new line
+  let currentLineStart = 0;
+  let shouldRestartRecognition = false;
+
+  // ====== Browser Support Check ======
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const supportsSTT = !!SpeechRecognition;
+
+  if (!supportsSTT) {
+    document.getElementById('warningBox').innerHTML = 
+      '<div class="warning">⚠️ 이 브라우저는 STT를 지원하지 않습니다. Chrome 또는 Edge 브라우저를 사용해주세요. (녹음은 정상 작동합니다)</div>';
+  }
+
+  // ====== Bars ======
+  const barsContainer = document.getElementById('bars');
+  for (let i = 0; i < 32; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    barsContainer.appendChild(bar);
+  }
+
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+  }
+
+  function formatTimeLong(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+      return String(hrs).padStart(2,'0') + ':' + String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+    }
+    return String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  function updateAudioLevel() {
+    if (!analyser) return;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+    
+    const bars = document.querySelectorAll('.bar');
+    bars.forEach((bar) => {
+      const height = isRecording 
+        ? Math.max(4, (avg / 255) * 100 * (0.5 + Math.random() * 0.5))
+        : 4;
+      bar.style.height = height + '%';
+      bar.classList.toggle('active', isRecording);
+    });
+    
+    animationId = requestAnimationFrame(updateAudioLevel);
+  }
+
+  // ====== Speech Recognition Setup ======
+  function setupRecognition() {
+    if (!supportsSTT) return null;
+    
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = document.getElementById('langSelect').value;
+    rec.maxAlternatives = 1;
+    
+    rec.onresult = (event) => {
+      let interim = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0].transcript.trim();
+        
+        if (result.isFinal) {
+          if (transcript) {
+            const now = Date.now();
+            const sinceLastSpeech = now - lastSpeechTime;
+            const elapsedAtSpeech = Math.floor((now - startTime) / 1000);
+            
+            // Decide whether to add a new line or continue
+            if (transcriptLines.length === 0 || sinceLastSpeech > silenceBreakThreshold) {
+              // New line (paragraph)
+              transcriptLines.push({
+                time: elapsedAtSpeech,
+                text: transcript,
+                final: true
+              });
+            } else {
+              // Append to last line
+              const last = transcriptLines[transcriptLines.length - 1];
+              last.text += ' ' + transcript;
+            }
+            
+            lastSpeechTime = now;
+          }
+        } else {
+          interim += transcript + ' ';
+        }
+      }
+      
+      interimText = interim.trim();
+      renderTranscript();
+    };
+    
+    rec.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'no-speech') {
+        // Common, just restart
+        return;
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        document.getElementById('warningBox').innerHTML = 
+          '<div class="error">마이크 권한이 필요합니다. 브라우저 설정을 확인하세요.</div>';
+      }
+    };
+    
+    rec.onend = () => {
+      // Auto-restart if still recording (browsers stop recognition after ~60s)
+      if (shouldRestartRecognition && isRecording) {
+        try {
+          rec.start();
+        } catch (e) {
+          console.log('Recognition restart failed:', e);
+        }
+      }
+    };
+    
+    return rec;
+  }
+
+  async function startRecording() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContextClass();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      updateAudioLevel();
+
+      let mimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      }
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const duration = Math.floor((Date.now() - startTime) / 1000);
+        const now = new Date();
+        const name = '회의 ' + 
+          String(now.getMonth() + 1).padStart(2, '0') + '/' +
+          String(now.getDate()).padStart(2, '0') + ' ' +
+          String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0');
+        
+        // Snapshot transcript at the moment of stopping
+        const transcriptSnapshot = JSON.parse(JSON.stringify(transcriptLines));
+        
+        const recording = {
+          id: 'rec_' + Date.now(),
+          name: name,
+          duration: duration,
+          url: url,
+          blob: blob,
+          createdAt: Date.now(),
+          mimeType: mimeType,
+          transcript: transcriptSnapshot,
+        };
+        
+        recordings.unshift(recording);
+        renderLibrary();
+        saveRecordingToDB(recording).catch(err => {
+          console.error('Failed to save to DB:', err);
+          showToast('⚠️ 저장 실패: ' + err.message);
+        });
+
+        stream.getTracks().forEach(track => track.stop());
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+        if (animationId) cancelAnimationFrame(animationId);
+        document.querySelectorAll('.bar').forEach(bar => {
+          bar.style.height = '4px';
+          bar.classList.remove('active');
+        });
+      };
+
+      // Reset transcript
+      transcriptLines = [];
+      interimText = '';
+      lastSpeechTime = Date.now();
+      renderTranscript();
+
+      startTime = Date.now();
+      mediaRecorder.start();
+      isRecording = true;
+      
+      // Start speech recognition
+      if (supportsSTT) {
+        recognition = setupRecognition();
+        if (recognition) {
+          shouldRestartRecognition = true;
+          try {
+            recognition.start();
+          } catch (e) {
+            console.log('Recognition start failed:', e);
+          }
+        }
+      }
+      
+      updateRecordingUI();
+      
+      timerId = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById('timeValue').textContent = formatTimeLong(elapsed);
+      }, 100);
+      
+    } catch (err) {
+      console.error('Mic error:', err);
+      let msg = '녹음을 시작할 수 없습니다: ' + err.message;
+      if (err.name === 'NotAllowedError') {
+        msg = '마이크 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.';
+      } else if (err.name === 'NotFoundError') {
+        msg = '마이크를 찾을 수 없습니다.';
+      }
+      document.getElementById('errorBox').innerHTML = '<div class="error">' + msg + '</div>';
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && isRecording) {
+      shouldRestartRecognition = false;
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+        recognition = null;
+      }
+      mediaRecorder.stop();
+      isRecording = false;
+      clearInterval(timerId);
+      document.getElementById('timeValue').textContent = '00:00';
+      interimText = '';
+      renderTranscript();
+      updateRecordingUI();
+    }
+  }
+
+  function updateRecordingUI() {
+    const btn = document.getElementById('recordBtn');
+    const icon = document.getElementById('recordIcon');
+    const timeValue = document.getElementById('timeValue');
+    const labelKo = document.getElementById('btnLabelKo');
+    const labelEn = document.getElementById('btnLabelEn');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const langSelect = document.getElementById('langSelect');
+    
+    if (isRecording) {
+      btn.classList.add('recording');
+      icon.innerHTML = '<rect x="6" y="6" width="12" height="12" fill="white"/>';
+      icon.setAttribute('width', '32');
+      icon.setAttribute('height', '32');
+      timeValue.classList.add('recording');
+      labelKo.textContent = '녹음 중단';
+      labelEn.textContent = 'CLICK TO STOP';
+      statusDot.classList.add('recording');
+      statusText.textContent = 'ON AIR · STT';
+      langSelect.disabled = true;
+      document.getElementById('errorBox').innerHTML = '';
+    } else {
+      btn.classList.remove('recording');
+      icon.innerHTML = '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line>';
+      icon.setAttribute('width', '40');
+      icon.setAttribute('height', '40');
+      timeValue.classList.remove('recording');
+      labelKo.textContent = '녹음 + STT 시작';
+      labelEn.textContent = 'CLICK TO START';
+      statusDot.classList.remove('recording');
+      statusText.textContent = 'STANDBY';
+      langSelect.disabled = false;
+    }
+  }
+
+  document.getElementById('recordBtn').addEventListener('click', () => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  });
+
+  // ====== Transcript Rendering ======
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  function renderTranscript() {
+    const body = document.getElementById('transcriptBody');
+    const wordCountEl = document.getElementById('wordCount');
+    
+    const hasContent = transcriptLines.length > 0 || interimText.length > 0;
+    
+    if (!hasContent) {
+      body.innerHTML = 
+        '<div class="transcript-empty" id="transcriptEmpty">' +
+        '<div class="transcript-empty-icon">' +
+        '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>' +
+        '<polyline points="14 2 14 8 20 8"></polyline>' +
+        '<line x1="16" y1="13" x2="8" y2="13"></line>' +
+        '<line x1="16" y1="17" x2="8" y2="17"></line>' +
+        '</svg></div>' +
+        '<p>' + (isRecording ? '듣고 있습니다... 말씀해 주세요' : '녹음을 시작하면 여기에 텍스트가 표시됩니다') + '</p>' +
+        '<p>' + (isRecording ? 'LISTENING...' : 'SPEECH WILL APPEAR HERE') + '</p>' +
+        '</div>';
+      wordCountEl.textContent = '0 단어';
+      document.getElementById('copyBtn').disabled = true;
+      document.getElementById('downloadTxtBtn').disabled = true;
+      document.getElementById('clearBtn').disabled = true;
+      return;
+    }
+    
+    let html = '';
+    transcriptLines.forEach((line) => {
+      html += '<div class="transcript-line">' +
+        '<span class="transcript-time">' + formatTime(line.time) + '</span>' +
+        '<span class="transcript-text">' + escapeHtml(line.text) + '</span>' +
+        '</div>';
+    });
+    
+    if (interimText) {
+      const elapsedAtSpeech = isRecording ? Math.floor((Date.now() - startTime) / 1000) : 0;
+      html += '<div class="transcript-line">' +
+        '<span class="transcript-time">' + formatTime(elapsedAtSpeech) + '</span>' +
+        '<span class="transcript-interim">' + escapeHtml(interimText) + '</span>' +
+        '</div>';
+    }
+    
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+    
+    // Word count
+    const totalText = transcriptLines.map(l => l.text).join(' ') + ' ' + interimText;
+    const wordCount = totalText.trim().split(/\s+/).filter(w => w.length > 0).length;
+    wordCountEl.textContent = wordCount + ' 단어';
+    
+    document.getElementById('copyBtn').disabled = transcriptLines.length === 0;
+    document.getElementById('downloadTxtBtn').disabled = transcriptLines.length === 0;
+    document.getElementById('clearBtn').disabled = transcriptLines.length === 0 && !isRecording;
+  }
+
+  function getTranscriptText(withTimestamps = true) {
+    if (withTimestamps) {
+      return transcriptLines.map(l => '[' + formatTime(l.time) + '] ' + l.text).join('\n\n');
+    }
+    return transcriptLines.map(l => l.text).join('\n\n');
+  }
+
+  // ====== Transcript Actions ======
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    const text = getTranscriptText(true);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('스크립트가 복사되었습니다');
+    } catch (e) {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('스크립트가 복사되었습니다');
+    }
+  });
+
+  document.getElementById('downloadTxtBtn').addEventListener('click', () => {
+    const text = getTranscriptText(true);
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const now = new Date();
+    a.download = '스크립트_' + now.toISOString().slice(0, 19).replace(/[T:]/g, '-') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('스크립트 다운로드 완료');
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (confirm('스크립트를 모두 지우시겠습니까?')) {
+      transcriptLines = [];
+      interimText = '';
+      renderTranscript();
+    }
+  });
+
+  // ====== Library ======
+  function togglePlay(id, event) {
+    if (event) event.stopPropagation();
+    const rec = recordings.find(r => r.id === id);
+    if (!rec) return;
+
+    if (currentPlayingId === id && currentAudio) {
+      if (currentAudio.paused) {
+        currentAudio.play();
+      } else {
+        currentAudio.pause();
+      }
+      renderLibrary();
+    } else {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+      }
+      currentAudio = new Audio(rec.url);
+      currentPlayingId = id;
+      
+      currentAudio.onended = () => {
+        currentPlayingId = null;
+        currentAudio = null;
+        renderLibrary();
+      };
+      currentAudio.onpause = () => renderLibrary();
+      currentAudio.onplay = () => renderLibrary();
+      
+      currentAudio.play();
+      renderLibrary();
+    }
+  }
+
+  function loadRecordingTranscript(id) {
+    const rec = recordings.find(r => r.id === id);
+    if (!rec || !rec.transcript) return;
+    if (isRecording) {
+      showToast('녹음 중에는 다른 스크립트를 볼 수 없습니다');
+      return;
+    }
+    transcriptLines = JSON.parse(JSON.stringify(rec.transcript));
+    interimText = '';
+    renderTranscript();
+    showToast('"' + rec.name + '" 스크립트를 불러왔습니다');
+  }
+
+  function downloadAudio(id, event) {
+    event.stopPropagation();
+    const rec = recordings.find(r => r.id === id);
+    if (!rec) return;
+    const a = document.createElement('a');
+    a.href = rec.url;
+    const ext = rec.mimeType.includes('mp4') ? 'mp4' : 'webm';
+    a.download = rec.name + '.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function downloadTranscript(id, event) {
+    event.stopPropagation();
+    const rec = recordings.find(r => r.id === id);
+    if (!rec || !rec.transcript || rec.transcript.length === 0) {
+      showToast('이 녹음에는 스크립트가 없습니다');
+      return;
+    }
+    const text = rec.transcript.map(l => '[' + formatTime(l.time) + '] ' + l.text).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = rec.name + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function deleteRecording(id, event) {
+    event.stopPropagation();
+    if (!confirm('이 녹음을 삭제하시겠습니까?')) return;
+    if (currentPlayingId === id && currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+      currentPlayingId = null;
+    }
+    const rec = recordings.find(r => r.id === id);
+    if (rec) URL.revokeObjectURL(rec.url);
+    recordings = recordings.filter(r => r.id !== id);
+    renderLibrary();
+    deleteRecordingFromDB(id).catch(err => console.error('DB delete failed:', err));
+  }
+
+  function renameRecording(id, event) {
+    event.stopPropagation();
+    const rec = recordings.find(r => r.id === id);
+    if (!rec) return;
+    const newName = prompt('새 이름을 입력하세요:', rec.name);
+    if (newName && newName.trim() && newName !== rec.name) {
+      rec.name = newName.trim();
+      renderLibrary();
+      updateRecordingInDB(id, { name: rec.name }).catch(err => console.error('Rename failed:', err));
+    }
+  }
+
+  function renderLibrary() {
+    const list = document.getElementById('libraryList');
+    document.getElementById('libraryCount').textContent = recordings.length;
+    document.getElementById('trackCount').textContent = recordings.length + ' TRACKS';
+
+    if (recordings.length === 0) {
+      list.innerHTML = '<div class="empty">아직 녹음이 없습니다</div>';
+      return;
+    }
+
+    list.innerHTML = recordings.map(rec => {
+      const isPlaying = currentPlayingId === rec.id && currentAudio && !currentAudio.paused;
+      const isCurrent = currentPlayingId === rec.id;
+      const hasTranscript = rec.transcript && rec.transcript.length > 0;
+      
+      const playIcon = isPlaying 
+        ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'
+        : '<svg width="14" height="14" viewBox="0 0 24 24" fill="white" style="margin-left: 2px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      
+      return '<div class="recording-item' + (isCurrent ? ' active' : '') + '" onclick="loadRecordingTranscript(\'' + rec.id + '\')">' +
+        '<div class="item-row">' +
+        '<button class="play-btn' + (isCurrent ? ' playing' : '') + '" onclick="togglePlay(\'' + rec.id + '\', event)">' +
+        playIcon + '</button>' +
+        '<div class="item-info">' +
+        '<div class="item-name">' + escapeHtml(rec.name) + '</div>' +
+        '<div class="item-meta">' +
+        '<span>' + formatTime(rec.duration) + '</span>' +
+        (hasTranscript ? '<span>· 📝 ' + rec.transcript.length + '줄</span>' : '<span>· STT 없음</span>') +
+        '</div></div>' +
+        '<div class="item-actions">' +
+        (hasTranscript ? '<button class="action-btn" onclick="downloadTranscript(\'' + rec.id + '\', event)" title="스크립트 다운로드"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></button>' : '') +
+        '<button class="action-btn" onclick="renameRecording(\'' + rec.id + '\', event)" title="이름 변경"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+        '<button class="action-btn" onclick="downloadAudio(\'' + rec.id + '\', event)" title="오디오 다운로드"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
+        '<button class="action-btn delete" onclick="deleteRecording(\'' + rec.id + '\', event)" title="삭제"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>' +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  renderLibrary();
+  renderTranscript();
+
+  // ====== Initialize: Load saved recordings from IndexedDB ======
+  (async function init() {
+    try {
+      db = await openDB();
+      const saved = await loadRecordingsFromDB();
+      if (saved.length > 0) {
+        recordings = saved;
+        renderLibrary();
+        showToast('💾 저장된 녹음 ' + saved.length + '개를 불러왔습니다');
+      }
+    } catch (err) {
+      console.error('DB init failed:', err);
+      showToast('⚠️ 저장소를 초기화할 수 없습니다. 녹음은 가능하지만 새로고침 시 사라집니다');
+    }
+  })();
+</script>
+
+</body>
+</html>
