@@ -275,20 +275,56 @@
     margin-bottom: 6px;
   }
   
-  .lang-selector select {
-    width: 100%;
+  .lang-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  
+  .lang-btn {
     background: #000;
     border: 1px solid #27272a;
     border-radius: 8px;
-    color: #d4d4d8;
-    padding: 8px 12px;
-    font-size: 13px;
+    color: #71717a;
+    padding: 10px 8px;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
   
-  .lang-selector select:focus {
-    outline: none;
+  .lang-btn:hover:not(:disabled) {
+    border-color: #52525b;
+    color: #d4d4d8;
+  }
+  
+  .lang-btn.active {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
     border-color: #dc2626;
+    color: white;
+    box-shadow: 0 4px 12px -2px rgba(127, 29, 29, 0.5);
+  }
+  
+  .lang-btn .flag {
+    font-size: 18px;
+    line-height: 1;
+  }
+  
+  .lang-btn .name {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  
+  .lang-hint {
+    font-size: 10px;
+    color: #52525b;
+    margin-top: 8px;
+    line-height: 1.4;
+    text-align: center;
   }
   
   .error {
@@ -654,17 +690,22 @@
   <div>
     <div class="panel recorder">
       <div class="lang-selector">
-        <label>LANGUAGE / 언어</label>
-        <select id="langSelect">
-          <option value="ko-KR">한국어 (Korean)</option>
-          <option value="en-US">English (US)</option>
-          <option value="en-GB">English (UK)</option>
-          <option value="ja-JP">日本語 (Japanese)</option>
-          <option value="zh-CN">中文 (Chinese)</option>
-          <option value="es-ES">Español (Spanish)</option>
-          <option value="fr-FR">Français (French)</option>
-          <option value="de-DE">Deutsch (German)</option>
-        </select>
+        <label>SPOKEN LANGUAGE / 발화 언어</label>
+        <div class="lang-buttons">
+          <button class="lang-btn active" data-lang="ko-KR" onclick="switchLang('ko-KR')">
+            <span class="flag">🇰🇷</span>
+            <span class="name">한국어</span>
+          </button>
+          <button class="lang-btn" data-lang="en-US" onclick="switchLang('en-US')">
+            <span class="flag">🇺🇸</span>
+            <span class="name">English</span>
+          </button>
+          <button class="lang-btn" data-lang="fr-FR" onclick="switchLang('fr-FR')">
+            <span class="flag">🇫🇷</span>
+            <span class="name">Français</span>
+          </button>
+        </div>
+        <div class="lang-hint">💡 화자가 바뀌면 클릭으로 즉시 전환</div>
       </div>
 
       <div class="time-display">
@@ -704,7 +745,7 @@
     <!-- Library -->
     <div class="panel library-section">
       <div class="library-header">
-        <h2>녹음!! 라이브러리</h2>
+        <h2>녹음 라이브러리</h2>
         <span class="word-count" id="libraryCount">0</span>
       </div>
       <div class="library-list" id="libraryList">
@@ -871,6 +912,29 @@
   let silenceBreakThreshold = 2500; // ms - pause before new line
   let currentLineStart = 0;
   let shouldRestartRecognition = false;
+  let currentLang = 'ko-KR'; // current STT language
+
+  // ====== Language Switching ======
+  function switchLang(lang) {
+    currentLang = lang;
+    // Update button UI
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.lang === lang);
+    });
+    
+    // If currently recording, restart recognition with new language
+    if (isRecording && recognition) {
+      const langName = lang === 'ko-KR' ? '한국어' : lang === 'en-US' ? 'English' : 'Français';
+      showToast('🌍 언어 전환: ' + langName);
+      
+      // Stop current recognition - it will auto-restart with new lang via onend handler
+      try {
+        recognition.stop();
+      } catch (e) {
+        console.log('Stop failed during switch:', e);
+      }
+    }
+  }
 
   // ====== Browser Support Check ======
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -937,7 +1001,7 @@
     const rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = document.getElementById('langSelect').value;
+    rec.lang = currentLang;
     rec.maxAlternatives = 1;
     
     rec.onresult = (event) => {
@@ -991,12 +1055,16 @@
     };
     
     rec.onend = () => {
-      // Auto-restart if still recording (browsers stop recognition after ~60s)
+      // Auto-restart if still recording (browsers stop recognition after ~60s, or on lang switch)
       if (shouldRestartRecognition && isRecording) {
-        try {
-          rec.start();
-        } catch (e) {
-          console.log('Recognition restart failed:', e);
+        // Create new recognition instance to pick up new language
+        recognition = setupRecognition();
+        if (recognition) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.log('Recognition restart failed:', e);
+          }
         }
       }
     };
@@ -1147,7 +1215,6 @@
     const labelEn = document.getElementById('btnLabelEn');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
-    const langSelect = document.getElementById('langSelect');
     
     if (isRecording) {
       btn.classList.add('recording');
@@ -1159,7 +1226,6 @@
       labelEn.textContent = 'CLICK TO STOP';
       statusDot.classList.add('recording');
       statusText.textContent = 'ON AIR · STT';
-      langSelect.disabled = true;
       document.getElementById('errorBox').innerHTML = '';
     } else {
       btn.classList.remove('recording');
@@ -1171,7 +1237,6 @@
       labelEn.textContent = 'CLICK TO START';
       statusDot.classList.remove('recording');
       statusText.textContent = 'STANDBY';
-      langSelect.disabled = false;
     }
   }
 
